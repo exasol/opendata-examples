@@ -4,6 +4,8 @@ You have the choice to create two sizes of database with the attached code  - yo
 
 These have the following row counts :-
 
+TABLE_NAME | START_SMALL | START_BIG
+---------- | ----------- | -----------------
 SALES | approx 350,000 | approx 200 million
 SALES AGENT | 10,000| 100,000
 SALES TERRITORY | 1,000 | 10,000
