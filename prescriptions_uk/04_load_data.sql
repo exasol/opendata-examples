@@ -19,7 +19,15 @@ merge into &STAGESCM..raw_data_urls tgt using &STAGESCM..stage_raw_data_urls src
 update &STAGESCM..raw_data_urls set FILE_NAME='T201009CHEM%20SUBS.CSV' where PERIOD='201009' and DESCRIPTION='Chemical names and BNF codes';
 update &STAGESCM..raw_data_urls set FILE_NAME='T201103ADDR%20BNFT.CSV' where PERIOD='201103' and DESCRIPTION='Practice codes, names and addresses';
 
+--take a look at the new files to load
+select * from &STAGESCM..raw_data_urls where loaded_timestamp is null;
 
+--TIP: all data will be loaded, that has no loaded_timestamp. 
+--     If you want to load the data on a small machine, you can simply set a dummy loaded_timestamp for older data
+--e.g.:
+-- update &STAGESCM..raw_data_urls set loaded_timestamp='0001-01-01 00:00:00' where period <= 201702;
+
+--this script loads all new data (delta load)
 EXECUTE SCRIPT &STAGESCM..PRESCRIPTIONS_LOAD();
 
 select * from &STAGESCM..JOB_DETAILS order by run_id desc,detail_id desc;

@@ -108,7 +108,7 @@ order by period]]) do
 	--preparation finished -> move from STAGE into PROD table
 	wrapper:query([[insert into ::PROD_SCM.::PROD_TBL 
 		(PERIOD, PRACTICE, PRACTICE_NAME, ADDRESS_PART1, ADDRESS_PART2, ADDRESS_PART3, ADDRESS_PART4, POSTCODE_FULL,POSTCODE) 
-		select PERIOD, PRACTICE, PRACTICE_NAME, ADDRESS_PART1, ADDRESS_PART2, ADDRESS_PART3, ADDRESS_PART4, POSTCODE_FULL,substr(postcode_full,0,instr(POSTCODE_FULL,' ')-1) from ::STAGE_SCM.::STAGE_TBL t 
+		select PERIOD, PRACTICE, PRACTICE_NAME, ADDRESS_PART1, ADDRESS_PART2, ADDRESS_PART3, ADDRESS_PART4, POSTCODE_FULL,substr(postcode_full,0,instr(POSTCODE_FULL,' ')-1) as POSTCODE from ::STAGE_SCM.::STAGE_TBL t 
 		where PERIOD=:PERIOD]])
 	--load successful -> update loaded_timestamp to indicate file doesn't need to be loaded anymore
 	wrapper:query([[update ::STAGE_SCM.RAW_DATA_URLS set LOADED_TIMESTAMP=CURRENT_TIMESTAMP 

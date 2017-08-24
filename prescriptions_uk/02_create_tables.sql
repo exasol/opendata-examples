@@ -1,4 +1,4 @@
---precondition: create QueryWrapper Scripts (used for logging)
+--!!!PRECONDITION!!!! create QueryWrapper Scripts (used for logging)
 --load it from https://raw.githubusercontent.com/EXASOL/etl-utils/master/query_wrapper.sql 
 
 create or replace table
@@ -57,7 +57,7 @@ create or replace table &PRODSCM..PRACTICE_ADDRESS (
 		ADDRESS_PART4 varchar(50),
 		POSTCODE_FULL varchar(50) NOT NULL, --detailed information (as it is in the data with outwards and inwards code
 		POSTCODE VARCHAR(5) NOT NULL -- only outwards code
-, PRIMARY KEY(SK_PRACTICE_ADDRESS)
+		, PRIMARY KEY(SK_PRACTICE_ADDRESS)
 	);
 
 
@@ -75,8 +75,7 @@ replace table
 		ACT_COST DECIMAL(10, 2),
 		QUANTITY DECIMAL(9),
 		PERIOD DECIMAL(6),
-		PERIOD_FIRST_DAY_AS_DATE DATE,
-		-- for convenience when using frontends
+		PERIOD_FIRST_DAY_AS_DATE DATE, -- for convenience when using frontends
 		SK_CHEM_SUB decimal(9) NOT NULL, -- added to make the lookup easier
 		SK_PRACTICE_ADDRESS DECIMAL(9) NOT NULL, -- added to make the lookup easier
 		FOREIGN KEY(SK_CHEM_SUB) REFERENCES &PRODSCM..CHEMICAL_SUBSTANCES(SK_CHEM_SUB),
