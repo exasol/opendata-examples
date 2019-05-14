@@ -2,7 +2,7 @@
 
 Example to load [Chicago's taxi dataset](http://digital.cityofchicago.org/index.php/chicago-taxi-data-released/) in an EXASOL database.
 
-##Instructions
+## Instructions
 
 ### Prerequisites: 
 - EXASOL database, that is allowed to connect to the Internet and that has access to a nameserver
