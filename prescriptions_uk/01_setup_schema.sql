@@ -1,7 +1,3 @@
-
---use variables for the SCHEMA names
-define STAGESCM=PRESCRIPTIONS_UK_STAGE;
-define PRODSCM=PRESCRIPTIONS_UK;
-
-create schema &PRODSCM;
-create schema &STAGESCM;
+-- schema setup
+create schema PRESCRIPTIONS_UK;
+create schema PRESCRIPTIONS_UK_STAGE;
