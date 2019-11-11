@@ -1,7 +1,7 @@
 -- refreshing the metadata for the dataset to check for new files
 -- for delta-loads re-create the staging tbl and then re-load the data
 CREATE OR REPLACE TABLE PRESCRIPTIONS_UK_STAGE.stage_raw_data_urls AS
-SELECT  description, TO_DATE(period,'MONTH YYYY') period, url
+SELECT  description, TO_NUMBER(TO_CHAR(TO_DATE('August 2018','MONTH YYYY'), 'YYYYMM'), '999999') period, url
 FROM   (SELECT PRESCRIPTIONS_UK_STAGE.json_parsing_datapackage()) a
 ORDER BY period;
 
