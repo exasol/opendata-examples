@@ -24,7 +24,10 @@ INSERT
 		site_url,
 		file_name
 	);
-	
+
+-- cleanup dead URL 
+DELETE FROM PRESCRIPTIONS_UK_STAGE.raw_data_urls WHERE SITE_URL LIKE '%datagov.ic.%';
+
 ----seems to be an error in the source data
 --UPDATE PRESCRIPTIONS_UK_STAGE.raw_data_urls
 --SET     FILE_NAME = 'T201009CHEM%20SUBS.CSV'
