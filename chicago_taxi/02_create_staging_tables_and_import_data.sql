@@ -1,7 +1,7 @@
---create staging tables and import data from sources
---prerequisites: your EXASOL database should be able to connect to the internet and should have a dns-server defined
+-- Create staging tables and import data from sources
+-- Prerequisites: your EXASOL database should be able to connect to the internet and should have a dns-server defined
 
-CREATE or replace TABLE &STAGESCM..trips_raw (
+CREATE OR REPLACE TABLE &STAGESCM..trips_raw (
   trip_id varchar(40),
   taxi_id varchar(255),
   trip_start_timestamp timestamp without time zone,
@@ -28,16 +28,12 @@ CREATE or replace TABLE &STAGESCM..trips_raw (
   community_areas decimal
 );
 
+-- Import all staging tables directly from the Chicago Taxi site
 
---import all staging tables directly from the chicago taxi site
+IMPORT INTO &STAGESCM..trips_raw FROM CSV AT 'https://data.cityofchicago.org/api/views/wrvz-psew' FILE 'rows.csv?accessType=DOWNLOAD'
+(1..2,3 FORMAT='MM/DD/YYYY HH12:MI:SS AM',4  FORMAT='MM/DD/YYYY HH12:MI:SS AM',5..24) SKIP=1;
 
-import into &STAGESCM..trips_raw from csv at 'https://data.cityofchicago.org/api/views/wrvz-psew' file 'rows.csv?accessType=DOWNLOAD'
-(1..2,3 FORMAT='MM/DD/YYYY HH12:MI:SS AM',4  FORMAT='MM/DD/YYYY HH12:MI:SS AM',5..24) skip=1;
-
-
-create or
-replace table
-	&STAGESCM..CENSUS_TRACTS(
+CREATE OR REPLACE TABLE	&STAGESCM..CENSUS_TRACTS(
 		THE_GEOM VARCHAR(2000000),
 		STATEFP10 decimal(9),
 		COUNTYFP10 DECIMAL(9),
@@ -49,11 +45,9 @@ replace table
 		COMMAREA_N decimal(9),
 		NOTES varchar(1000)
 	);
-import into &STAGESCM..CENSUS_TRACTS from csv at 'https://data.cityofchicago.org/api/views/74p9-q2aq' file 'rows.csv?accessType=DOWNLOAD' SKIP=1;
+IMPORT INTO &STAGESCM..CENSUS_TRACTS FROM CSV AT 'https://data.cityofchicago.org/api/views/74p9-q2aq' FILE 'rows.csv?accessType=DOWNLOAD' SKIP=1;
 
-
-create or replace table
-	&STAGESCM..COMMUNITY_AREAS(
+CREATE OR REPLACE TABLE	&STAGESCM..COMMUNITY_AREAS(
 		the_geom varchar(2000000),
 		PERIMETER DECIMAL(9),
 		AREA DECIMAL(9),
@@ -65,5 +59,4 @@ create or replace table
 		SHAPE_AREA double,
 		SHAPE_LEN double
 	);
-import into &STAGESCM..COMMUNITY_AREAS from csv at 'https://data.cityofchicago.org/api/views/igwz-8jzy' file 'rows.csv?accessType=DOWNLOAD' SKIP=1;
-
+IMPORT INTO &STAGESCM..COMMUNITY_AREAS FROM CSV AT at 'https://data.cityofchicago.org/api/views/igwz-8jzy' FILE 'rows.csv?accessType=DOWNLOAD' SKIP=1;
