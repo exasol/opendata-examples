@@ -1,31 +1,30 @@
 -- Create staging tables and import data from sources
 -- Prerequisites: your EXASOL database should be able to connect to the internet and should have a dns-server defined
 
-CREATE OR REPLACE TABLE &STAGESCM..trips_raw (
-  trip_id varchar(40),
-  taxi_id varchar(255),
-  trip_start_timestamp timestamp without time zone,
-  trip_end_timestamp timestamp without time zone,
-  trip_seconds decimal(9),
-  trip_miles decimal(18,4),
-  pickup_census_tract varchar(100),
-  dropoff_census_tract varchar(100),
-  pickup_community_area decimal,
-  dropoff_community_area decimal,
-  fare varchar(100),
-  tips varchar(100),
-  tolls varchar(100),
-  extras varchar(100),
-  trip_total varchar(100),
-  payment_type varchar(100),
-  company varchar(100),
-  pickup_centroid_latitude decimal(18,9),
-  pickup_centroid_longitude decimal(18,9),
-  pickup_centroid_location varchar(100),
-  dropoff_centroid_latitude numeric(18,9),
-  dropoff_centroid_longitude numeric(18,9),
-  dropoff_centroid_location varchar(100),
-  community_areas decimal
+CREATE OR REPLACE TABLE CHICAGO_TAXI_STAGE.TRIPS_RAW (
+  TRIP_ID VARCHAR(40),
+  TAXI_ID VARCHAR(255),
+  TRIP_START_TIMESTAMP TIMESTAMP WITHOUT TIME ZONE,
+  TRIP_END_TIMESTAMP TIMESTAMP WITHOUT TIME ZONE,
+  TRIP_SECONDS DECIMAL(9),
+  TRIP_MILES DECIMAL(18,4),
+  PICKUP_CENSUS_TRACT VARCHAR(100),
+  DROPOFF_CENSUS_TRACT VARCHAR(100),
+  PICKUP_COMMUNITY_AREA DECIMAL,
+  DROPOFF_COMMUNITY_AREA DECIMAL,
+  FARE VARCHAR(100),
+  TIPS VARCHAR(100),
+  TOLLS VARCHAR(100),
+  EXTRAS VARCHAR(100),
+  TRIP_TOTAL VARCHAR(100),
+  PAYMENT_TYPE VARCHAR(100),
+  COMPANY VARCHAR(100),
+  PICKUP_CENTROID_LATITUDE DECIMAL(18,9),
+  PICKUP_CENTROID_LONGITUDE DECIMAL(18,9),
+  PICKUP_CENTROID_LOCATION VARCHAR(100),
+  DROPOFF_CENTROID_LATITUDE NUMERIC(18,9),
+  DROPOFF_CENTROID_LONGITUDE NUMERIC(18,9),
+  DROPOFF_CENTROID_LOCATION VARCHAR(100)
 );
 
 -- Import all staging tables directly from the Chicago Taxi site
