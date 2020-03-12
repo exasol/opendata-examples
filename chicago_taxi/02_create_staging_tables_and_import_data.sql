@@ -59,4 +59,4 @@ CREATE OR REPLACE TABLE	&STAGESCM..COMMUNITY_AREAS(
 		SHAPE_AREA double,
 		SHAPE_LEN double
 	);
-IMPORT INTO &STAGESCM..COMMUNITY_AREAS FROM CSV AT at 'https://data.cityofchicago.org/api/views/igwz-8jzy' FILE 'rows.csv?accessType=DOWNLOAD' SKIP=1;
+IMPORT INTO &STAGESCM..COMMUNITY_AREAS FROM CSV AT 'https://data.cityofchicago.org/api/views/igwz-8jzy' FILE 'rows.csv?accessType=DOWNLOAD' SKIP=1;
