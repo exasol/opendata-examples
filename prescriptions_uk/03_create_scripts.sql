@@ -181,8 +181,7 @@ for PERIOD,SITE_URL,FILE_NAME in wrapper:query_values([[SELECT PERIOD,SITE_URL,F
                                                         ORDER BY PERIOD]]) do
 	process_file(PERIOD,SITE_URL,FILE_NAME) 
 	
-	--preparation finished -> move from STAGE into PROD table
-	-- edit: left joins for ::prod_SCM and PROD_SCM.Chemical produce errors because of missing SK_PRACTICE_ADDRESS in ::PROD_SCM.::PROD_TBL 
+	--preparation finished -> move from STAGE into PROD table 
 	wrapper:query([[
                 INSERT INTO ::PROD_SCM.::PROD_TBL 
                 SELECT  p.*, 
