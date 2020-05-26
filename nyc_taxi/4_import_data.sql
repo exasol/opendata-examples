@@ -22,7 +22,7 @@ CREATE OR REPLACE TABLE NYC_TAXI_STAGE.TMP_TAXI_ZONE_POLYGONS (
 
 --import polygon strings
 IMPORT INTO NYC_TAXI_STAGE."TMP_TAXI_ZONE_POLYGONS" 
-FROM LOCAL CSV FILE 'C:\Users\ln\Documents\GitHub\opendata-examples\ny_taxi\taxi_zones(2).csv' (1..5, 7)
+FROM CSV AT 'https://raw.githubusercontent.com/exasol/opendata-examples/LN_update_11_2019/ny_taxi/' FILE 'taxi_zones.csv' (1..5, 7)
 SKIP = 1
 ROW SEPARATOR = 'LF'
 COLUMN SEPARATOR = ';'

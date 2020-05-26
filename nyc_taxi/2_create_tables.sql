@@ -29,7 +29,7 @@ CREATE OR REPLACE TABLE NYC_TAXI_STAGE.raw_data_urls(   id DECIMAL IDENTITY,
 --create staging table for geo clustering
 CREATE OR REPLACE TABLE NYC_TAXI_STAGE.trip_location_id_map (      trip_id decimal(12), 
                                                                 PICKUP_LOCATIONID DECIMAL(3), 
-                                                                DROPFF_LOCATIONID DECIMAL(3));
+                                                                DROPOFF_LOCATIONID DECIMAL(3));
 
 --stage and prod trip tables
 CREATE OR REPLACE TABLE NYC_TAXI_STAGE.TRIPDATA  (

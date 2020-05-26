@@ -6,9 +6,7 @@ function process_file(FILE_ID, TRIP_MONTH,SITE_URL, FILENAME, INSERT_COLS, CREAT
         wrapper:set_param('SITE_URL',SITE_URL) 
 	wrapper:set_param('FILENAME',FILENAME) 
 	wrapper:set_param('FILE_ID',FILE_ID)
-	
-	--set SCHEMA / TABLE for staging table
-        wrapper:set_param('STAGE_TBL',quote('TRIPDATA'))
+        
         wrapper:set_param('LOCATION_MAP',quote('TRIP_LOCATION_ID_MAP'))
         wrapper:set_param('ACCEPTED_ERRORS_PER_FILE',10000)
 	wrapper:set_param('STAGE_ERROR_TBL',quote('ERRORS_TRIPDATA'))
@@ -19,18 +17,18 @@ function process_file(FILE_ID, TRIP_MONTH,SITE_URL, FILENAME, INSERT_COLS, CREAT
 	end
         
         --cleanup
-        wrapper:query([[DELETE FROM NYC_TAXI_STAGE.::STAGE_TBL where FILE_ID=:FILE_ID]])
+        wrapper:query([[DELETE FROM ::STAGE_SCM.::STAGE_TBL where FILE_ID=:FILE_ID]])
         
         --import data into target table (insert with import as a subselect to add metadata like file_id)
-        wrapper:query([[create or replace table NYC_TAXI_STAGE.::STAGE_TMP_TBL (]]..CREATE_COLS..[[)]])
+        wrapper:query([[CREATE OR REPLACE TABLE ::STAGE_SCM.::STAGE_TMP_TBL (]]..CREATE_COLS..[[)]])
         
         
 	_,res = wrapper:query([[
-	       IMPORT INTO NYC_TAXI_STAGE.::STAGE_TMP_TBL (]]..INSERT_COLS..[[) 
+	       IMPORT INTO ::STAGE_SCM.::STAGE_TMP_TBL (]]..INSERT_COLS..[[) 
 	       FROM CSV AT :SITE_URL FILE :FILENAME ]]..TMP_FILE_OPTIONS..[[
 	       SKIP=1 
 	       ROW SEPARATOR='CRLF' 
-	       ERRORS INTO NYC_TAXI_STAGE.::STAGE_ERROR_TBL 
+	       ERRORS INTO ::STAGE_SCM.::STAGE_ERROR_TBL 
 	       REJECT LIMIT :ACCEPTED_ERRORS_PER_FILE]])
 	       
 	if (res.etl_rows_with_error > 0) then
@@ -38,36 +36,43 @@ function process_file(FILE_ID, TRIP_MONTH,SITE_URL, FILENAME, INSERT_COLS, CREAT
 	end
 	
 	--insert into stage from tmp_stage
-	wrapper:query([[INSERT INTO NYC_TAXI_STAGE.::STAGE_TBL (FILE_ID, VENDOR_TYPE, ]]..INSERT_COLS..[[)
+	wrapper:query([[INSERT INTO ::STAGE_SCM.::STAGE_TBL (FILE_ID, VENDOR_TYPE, ]]..INSERT_COLS..[[)
 	                       select :FILE_ID,:VENDOR_TYPE,]]..INSERT_COLS..[[ 
-	                       from NYC_TAXI_STAGE.::STAGE_TMP_TBL]])
+	                       from ::STAGE_SCM.::STAGE_TMP_TBL]])
 	
 	--drop tmp_stage               
-	wrapper:query([[DROP TABLE NYC_TAXI_STAGE.::STAGE_TMP_TBL]])          
+	wrapper:query([[DROP TABLE ::STAGE_SCM.::STAGE_TMP_TBL]])          
 	
 	--Calculate geometric points for pickup and dropff LONG/LAT and update in stage_table
-        wrapper:query([[UPDATE NYC_TAXI_STAGE.::STAGE_TBL 
+        wrapper:query([[UPDATE ::STAGE_SCM.::STAGE_TBL 
                         SET PICKUP_GEOM = 'POINT(' || pickup_longitude  || ' ' || pickup_latitude  || ')' 
                         WHERE pickup_longitude IS NOT NULL 
-                                AND pickup_latitude IS NOT NULL]])
+                                AND pickup_latitude IS NOT NULL
+                                AND PICKUP_GEOM IS NULL]])
                                 
-        wrapper:query([[UPDATE NYC_TAXI_STAGE.::STAGE_TBL
+        wrapper:query([[UPDATE ::STAGE_SCM.::STAGE_TBL
                         SET DROPOFF_GEOM = 'POINT(' || dropoff_longitude || ' ' || dropoff_latitude || ')' 
                         WHERE dropoff_longitude IS NOT NULL 
-                                AND dropoff_latitude IS NOT NULL;]])
-
+                                AND dropoff_latitude IS NOT NULL
+                                AND DROPOFF_GEOM IS NULL]])
+        
+        --Insert trip id's where location_map calculation is necessary into location_map
+        wrapper:query([[INSERT INTO ::STAGE_SCM.::LOCATION_MAP (trip_id)
+                        SELECT id FROM ::STAGE_SCM.::STAGE_TBL
+                        WHERE dropoff_locationid IS NULL
+                                OR pickup_locationid IS NULL]])
 	
 	-- Cluster geo data into taxi zones
-	wrapper:query([[INSERT INTO NYC_TAXI_STAGE.::LOCATION_MAP
-                        SELECT t.id,
-                               z1.location_id AS pickup_location_id,
-                               z2.location_id AS dropff_location_id
-                        FROM NYC_TAXI_STAGE.::STAGE_TBL t
-                        JOIN NYC_TAXI.TAXI_ZONES z1 ON ST_within(t.pickup_geom, z1.polygon) = true
-                        JOIN NYC_TAXI.TAXI_ZONES z2 ON ST_within(t.dropoff_geom, z2.polygon) = true]])
-
+	wrapper:query([[UPDATE  ::STAGE_SCM.::LOCATION_MAP
+                        SET     dropoff_locationid = zd.location_id,
+                                pickup_locationid = zp.location_id
+                        FROM ::STAGE_SCM.::STAGE_TBL t
+                        JOIN ::STAGE_SCM.::LOCATION_MAP m       ON m.trip_id = t.id 
+                        JOIN ::PROD_SCM.TAXI_ZONES zp           ON ST_within(t.pickup_geom, zp.polygon) = true
+                        JOIN ::PROD_SCM.TAXI_ZONES zd           ON ST_within(t.dropoff_geom, zd.polygon) = true]])
+        
 	--preparation finished -> move from STAGE into PROD table
-        wrapper:query([=[INSERT INTO NYC_TAXI.::PROD_TBL
+        wrapper:query([=[INSERT INTO ::PROD_SCM.::PROD_TBL
                         SELECT  t.id,
                                 t.file_id AS src_file_id,
                                 c.cab_type_id,
@@ -105,12 +110,15 @@ function process_file(FILE_ID, TRIP_MONTH,SITE_URL, FILENAME, INSERT_COLS, CREAT
                                         ELSE Null
                                         END AS payment_type,
                                 t.trip_type
-                        FROM NYC_TAXI.::PROD_TBL t
-                        LEFT OUTER JOIN NYC_TAXI.CAB_TYPES c ON t.vendor_type = c.type
-                        LEFT OUTER JOIN NYC_TAXI_STAGE.::LOCATION_MAP z ON t.id = z.trip_id]=])
-
+                        FROM ::PROD_SCM.::PROD_TBL t
+                        LEFT OUTER JOIN ::PROD_SCM.CAB_TYPES c ON t.vendor_type = c.type
+                        LEFT OUTER JOIN ::STAGE_SCM.::LOCATION_MAP z ON t.id = z.trip_id]=])
+        
+        --truncate stage table
+        wrapper:query([[TRUNCATE TABLE ::STAGE_SCM.::STAGE_TBL]])
+        
 	--load successful -> update loaded_timestamp to indicate file doesn't need to be loaded anymore
-	wrapper:query([[UPDATE NYC_TAXI_STAGE.RAW_DATA_URLS 
+	wrapper:query([[UPDATE ::STAGE_SCM.RAW_DATA_URLS 
 	               SET LOADED_TIMESTAMP=CURRENT_TIMESTAMP 
 	               WHERE ID=:FILE_ID]])
 end
@@ -118,6 +126,11 @@ end
 --initialize query wrapper
 wrapper = QW.new( 'NYC_TAXI_STAGE.JOB_LOG', 'NYC_TAXI_STAGE.JOB_DETAILS', 'TRIPS_LOAD')
 
+--set SCHEMA / TABLE for staging table
+wrapper:set_param('STAGE_SCM',quote('NYC_TAXI_STAGE'))
+wrapper:set_param('STAGE_TBL',quote('TRIPDATA'))
+
+wrapper:set_param('PROD_SCM',quote('NYC_TAXI')) 
 wrapper:set_param('PROD_TBL',quote('TRIPS'))
 
 _,SESSION_ID = wrapper:query([[select to_char(CURRENT_SESSION)]])
@@ -130,7 +143,7 @@ wrapper:set_param('STAGE_TMP_TBL','TRIPDATA_'..SESSION_ID[1][1])
 --load yellow from start to 2015
 wrapper:set_param('VENDOR_TYPE','yellow')  
 for FILE_ID,TRIP_MONTH,SITE_URL,FILENAME in wrapper:query_values( [[    select ID, TRIP_MONTH, SITE_URL,FILENAME 
-                                                                        from NYC_TAXI_STAGE.RAW_DATA_URLS 
+                                                                        from ::STAGE_SCM.RAW_DATA_URLS 
                                                                         where LOADED_TIMESTAMP is NULL 
                                                                         and TYPE=:VENDOR_TYPE 
                                                                         and TRIP_MONTH < '2015-01-01']]) do
@@ -176,7 +189,7 @@ end
 
 --load yellow from 2015 to 2016-07 (Pickup/Dropoff Longitude/Latitude replaced with LocationID)
 for FILE_ID,TRIP_MONTH,SITE_URL,FILENAME in wrapper:query_values( [[    select ID, TRIP_MONTH, SITE_URL,FILENAME 
-                                                                        from NYC_TAXI_STAGE.RAW_DATA_URLS 
+                                                                        from ::STAGE_SCM.RAW_DATA_URLS 
                                                                         where LOADED_TIMESTAMP is NULL 
                                                                         and TYPE=:VENDOR_TYPE 
                                                                         and TRIP_MONTH >= '2015-01-01'
@@ -225,7 +238,7 @@ end
 
 --load yellow from 2016-07 to end
 for FILE_ID,TRIP_MONTH,SITE_URL,FILENAME in wrapper:query_values( [[    select ID, TRIP_MONTH, SITE_URL,FILENAME 
-                                                                        from NYC_TAXI_STAGE.RAW_DATA_URLS 
+                                                                        from ::STAGE_SCM.RAW_DATA_URLS 
                                                                         where LOADED_TIMESTAMP is NULL 
                                                                         and TYPE=:VENDOR_TYPE 
                                                                         /*and TRIP_MONTH >= '2016-07-01'*/
@@ -275,7 +288,7 @@ end
 wrapper:set_param('VENDOR_TYPE','green')  
 --load green from start to 2015
 for FILE_ID,TRIP_MONTH,SITE_URL,FILENAME in wrapper:query_values( [[    select ID, TRIP_MONTH, SITE_URL,FILENAME 
-                                                                        from NYC_TAXI_STAGE.RAW_DATA_URLS 
+                                                                        from ::STAGE_SCM.RAW_DATA_URLS 
                                                                         where LOADED_TIMESTAMP is NULL 
                                                                         and TYPE=:VENDOR_TYPE 
                                                                         and TRIP_MONTH < '2015-01-01']]) do
@@ -325,7 +338,7 @@ end
 
 --load green from 2015-2017 (IMPROVEMENT_SURCHARGE was added)
 for FILE_ID,TRIP_MONTH,SITE_URL,FILENAME in wrapper:query_values( [[    select ID, TRIP_MONTH, SITE_URL,FILENAME 
-                                                                        from NYC_TAXI_STAGE.RAW_DATA_URLS 
+                                                                        from ::STAGE_SCM.RAW_DATA_URLS 
                                                                         where LOADED_TIMESTAMP is NULL 
                                                                         and TYPE=:VENDOR_TYPE 
                                                                         and TRIP_MONTH >= '2015-01-01'
@@ -378,7 +391,7 @@ end
 
 --load green from 2017-2019 (PICKUP_LAT/LONG and DROPOFF_LAT/LONG were replaced by PICKUP/DROPOFF_LOCATIONID)
 for FILE_ID,TRIP_MONTH,SITE_URL,FILENAME in wrapper:query_values( [[    select ID, TRIP_MONTH, SITE_URL,FILENAME 
-                                                                        from NYC_TAXI_STAGE.RAW_DATA_URLS 
+                                                                        from ::STAGE_SCM.RAW_DATA_URLS 
                                                                         where LOADED_TIMESTAMP is NULL 
                                                                         and TYPE=:VENDOR_TYPE 
                                                                         and TRIP_MONTH >= '2017-01-01'
