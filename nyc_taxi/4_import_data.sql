@@ -22,7 +22,7 @@ CREATE OR REPLACE TABLE NYC_TAXI_STAGE.TMP_TAXI_ZONE_POLYGONS (
 
 --import polygon strings
 IMPORT INTO NYC_TAXI_STAGE."TMP_TAXI_ZONE_POLYGONS" 
-FROM CSV AT 'https://raw.githubusercontent.com/exasol/opendata-examples/LN_update_11_2019/ny_taxi/' FILE 'taxi_zones.csv' (1..5, 7)
+FROM CSV AT 'https://raw.githubusercontent.com/exasol/opendata-examples/LN_update_11_2019/nyc_taxi/' FILE 'taxi_zones.csv' (1..5, 7)
 SKIP = 1
 ROW SEPARATOR = 'LF'
 COLUMN SEPARATOR = ';'
@@ -63,21 +63,27 @@ INSERT INTO NYC_TAXI.cab_types (type) SELECT 'green';
 INSERT INTO NYC_TAXI.cab_types (type) SELECT 'uber';
 
 --fill vendor_lookup
-INSERT INTO NYC_TAXI.vendor_lookup VALUES (1, 'Creative Mobile Technologies', 'CMT');
-INSERT INTO NYC_TAXI.vendor_lookup VALUES (2, 'VeriFone Inc.', 'VTS');
-INSERT INTO NYC_TAXI.vendor_lookup VALUES (3, 'Digital Dispatch Systems', 'DDS');
+INSERT INTO NYC_TAXI.vendor_lookup VALUES (1, 'Creative Mobile Technologies', 'CMT'),
+                                          (2, 'VeriFone Inc.', 'VTS'),
+                                          (3, 'Digital Dispatch Systems', 'DDS');
 
 --fill trip_type_lookup
-INSERT INTO NYC_TAXI.trip_type_lookup VALUES (1, 'Street-hail');
-INSERT INTO NYC_TAXI.trip_type_lookup VALUES (2, 'Dispatch');
+INSERT INTO NYC_TAXI.trip_type_lookup VALUES    (1, 'Street-hail'),
+                                                (2, 'Dispatch');
 
 --fill rate_code_lookup
-INSERT INTO NYC_TAXI.rate_code_lookup VALUES (1, 'Standard rate');
-INSERT INTO NYC_TAXI.rate_code_lookup VALUES (2, 'JFK');
-INSERT INTO NYC_TAXI.rate_code_lookup VALUES (3, 'Newark');
-INSERT INTO NYC_TAXI.rate_code_lookup VALUES (4, 'Nassau or Westchester');
-INSERT INTO NYC_TAXI.rate_code_lookup VALUES (5, 'Negotiated fare');
-INSERT INTO NYC_TAXI.rate_code_lookup VALUES (6, 'Group ride');
+INSERT INTO NYC_TAXI.rate_code_lookup VALUES    (1, 'Standard rate'), 
+                                                (2, 'JFK'),
+                                                (3, 'Newark'),
+                                                (4, 'Nassau or Westchester'),
+                                                (5, 'Negotiated fare'),
+                                                (6, 'Group ride');
+
+--fill dispatching_base_lookup
+INSERT INTO NYC_TAXI.hvfhs_license_lookup VALUES        (1, 'HV0002', 'Juno'),
+                                                        (2, 'HV0003', 'Uber'),
+                                                        (3, 'HV0004', 'Via'),
+                                                        (4, 'HV0005', 'Lyft');
 
 -- load data
 --TIP: all data will be loaded, that has no loaded_timestamp.
