@@ -17,11 +17,12 @@ function process_file(FILE_ID, TRIP_MONTH,SITE_URL, FILENAME, INSERT_COLS, CREAT
 	end
         
         --cleanup
-        wrapper:query([[DELETE FROM ::STAGE_SCM.::STAGE_TBL where FILE_ID=:FILE_ID]])
-        
+        wrapper:query([[DELETE FROM ::STAGE_SCM.::STAGE_TBL WHERE FILE_ID=:FILE_ID]])
+        wrapper:query([[TRUNCATE TABLE ::STAGE_SCM.::STAGE_TBL]])
+        wrapper:query([[TRUNCATE TABLE ::STAGE_SCM.::LOCATION_MAP]])
+
         --import data into target table (insert with import as a subselect to add metadata like file_id)
         wrapper:query([[CREATE OR REPLACE TABLE ::STAGE_SCM.::STAGE_TMP_TBL (]]..CREATE_COLS..[[)]])
-        
         
 	_,res = wrapper:query([[
 	       IMPORT INTO ::STAGE_SCM.::STAGE_TMP_TBL (]]..INSERT_COLS..[[) 
@@ -45,32 +46,38 @@ function process_file(FILE_ID, TRIP_MONTH,SITE_URL, FILENAME, INSERT_COLS, CREAT
 	
 	--Calculate geometric points for pickup and dropff LONG/LAT and update in stage_table
         wrapper:query([[UPDATE ::STAGE_SCM.::STAGE_TBL 
-                        SET PICKUP_GEOM = 'POINT(' || pickup_longitude  || ' ' || pickup_latitude  || ')' 
+                        SET PICK_GEOM = 'POINT(' || pickup_longitude  || ' ' || pickup_latitude  || ')' 
                         WHERE pickup_longitude IS NOT NULL 
                                 AND pickup_latitude IS NOT NULL
-                                AND PICKUP_GEOM IS NULL]])
+                                AND PICK_GEOM IS NULL]])
                                 
         wrapper:query([[UPDATE ::STAGE_SCM.::STAGE_TBL
-                        SET DROPOFF_GEOM = 'POINT(' || dropoff_longitude || ' ' || dropoff_latitude || ')' 
+                        SET DROP_GEOM = 'POINT(' || dropoff_longitude || ' ' || dropoff_latitude || ')' 
                         WHERE dropoff_longitude IS NOT NULL 
                                 AND dropoff_latitude IS NOT NULL
-                                AND DROPOFF_GEOM IS NULL]])
+                                AND DROP_GEOM IS NULL]])
         
         --Insert trip id's where location_map calculation is necessary into location_map
         wrapper:query([[INSERT INTO ::STAGE_SCM.::LOCATION_MAP (trip_id)
                         SELECT id FROM ::STAGE_SCM.::STAGE_TBL
                         WHERE dropoff_locationid IS NULL
                                 OR pickup_locationid IS NULL]])
-	
+
 	-- Cluster geo data into taxi zones
-	wrapper:query([[UPDATE  ::STAGE_SCM.::LOCATION_MAP
-                        SET     dropoff_locationid = zd.location_id,
-                                pickup_locationid = zp.location_id
-                        FROM ::STAGE_SCM.::STAGE_TBL t
-                        JOIN ::STAGE_SCM.::LOCATION_MAP m       ON m.trip_id = t.id 
-                        JOIN ::PROD_SCM.TAXI_ZONES zp           ON ST_within(t.pickup_geom, zp.polygon) = true
-                        JOIN ::PROD_SCM.TAXI_ZONES zd           ON ST_within(t.dropoff_geom, zd.polygon) = true]])
-        
+	wrapper:query([[MERGE INTO ::STAGE_SCM.::LOCATION_MAP insert_target
+                        USING   (SELECT DISTINCT t.id,
+                                        FIRST_VALUE(zd.location_id) OVER (PARTITION BY t.id) AS dropoff,
+                                        FIRST_VALUE(zp.location_id) OVER (PARTITION BY t.id) AS pickup
+                                 FROM ::STAGE_SCM.::STAGE_TBL t
+                                 JOIN ::STAGE_SCM.::LOCATION_MAP m    ON m.trip_id = t.id 
+                                 JOIN ::PROD_SCM.TAXI_ZONES zp        ON ST_within(t.pick_geom, zp.polygon) = true
+                                 JOIN ::PROD_SCM.TAXI_ZONES zd        ON ST_within(t.drop_geom, zd.polygon) = true)
+                        subselect
+                        ON      insert_target.trip_id = subselect.id
+                        WHEN MATCHED THEN 
+                                UPDATE SET      dropoff_locationid = dropoff,
+                                                pickup_locationid  = pickup]])
+
 	--preparation finished -> move from STAGE into PROD table
         wrapper:query([=[INSERT INTO ::PROD_SCM.::PROD_TBL
                         SELECT  t.id,
@@ -81,6 +88,7 @@ function process_file(FILE_ID, TRIP_MONTH,SITE_URL, FILENAME, INSERT_COLS, CREAT
                                         WHEN vendor_id = 'DDS' THEN 3
                                         ELSE CAST(vendor_id AS DECIMAL(1))
                                         END AS vendor_id,
+                                l.id,
                                 TO_DATE(t.pickup_datetime, 'YYYY-MM-DD') AS pickup_date,
                                 TO_DATE(t.dropoff_datetime, 'YYYY-MM-DD') AS dropoff_date,
                                 t.pickup_datetime,
@@ -89,10 +97,10 @@ function process_file(FILE_ID, TRIP_MONTH,SITE_URL, FILENAME, INSERT_COLS, CREAT
                                 t.rate_code_id,
                                 t.pickup_longitude,
                                 t.pickup_latitude,
-                                z.pickup_locationid,
+                                CASE    WHEN z.trip_id IS NULL THEN t.pickup_locationid ELSE z.pickup_locationid END AS pickup_locationid,
                                 t.dropoff_longitude,
                                 t.dropoff_latitude,
-                                z.dropff_location_id,
+                                CASE    WHEN z.trip_id IS NULL THEN t.dropoff_locationid ELSE z.dropoff_locationid END AS dropoff_locationid,
                                 t.passenger_count,
                                 t.trip_distance,
                                 t.fare_amount,
@@ -110,17 +118,16 @@ function process_file(FILE_ID, TRIP_MONTH,SITE_URL, FILENAME, INSERT_COLS, CREAT
                                         ELSE Null
                                         END AS payment_type,
                                 t.trip_type
-                        FROM ::PROD_SCM.::PROD_TBL t
+                        FROM ::STAGE_SCM.::STAGE_TBL t
                         LEFT OUTER JOIN ::PROD_SCM.CAB_TYPES c ON t.vendor_type = c.type
-                        LEFT OUTER JOIN ::STAGE_SCM.::LOCATION_MAP z ON t.id = z.trip_id]=])
-        
-        --truncate stage table
-        wrapper:query([[TRUNCATE TABLE ::STAGE_SCM.::STAGE_TBL]])
+                        LEFT OUTER JOIN ::STAGE_SCM.::LOCATION_MAP z ON t.id = z.trip_id
+                        LEFT OUTER JOIN ::PROD_SCM.HVFHS_LICENSE_LOOKUP l ON t.hvfhs_license_num = l.high_volume_license_number]=])
         
 	--load successful -> update loaded_timestamp to indicate file doesn't need to be loaded anymore
 	wrapper:query([[UPDATE ::STAGE_SCM.RAW_DATA_URLS 
-	               SET LOADED_TIMESTAMP=CURRENT_TIMESTAMP 
-	               WHERE ID=:FILE_ID]])
+	                SET LOADED_TIMESTAMP=CURRENT_TIMESTAMP 
+	                WHERE ID=:FILE_ID]])
+        wrapper:commit()
 end
 
 --initialize query wrapper
@@ -130,10 +137,10 @@ wrapper = QW.new( 'NYC_TAXI_STAGE.JOB_LOG', 'NYC_TAXI_STAGE.JOB_DETAILS', 'TRIPS
 wrapper:set_param('STAGE_SCM',quote('NYC_TAXI_STAGE'))
 wrapper:set_param('STAGE_TBL',quote('TRIPDATA'))
 
-wrapper:set_param('PROD_SCM',quote('NYC_TAXI')) 
+wrapper:set_param('PROD_SCM',quote('NYC_TAXI_')) 
 wrapper:set_param('PROD_TBL',quote('TRIPS'))
 
-_,SESSION_ID = wrapper:query([[select to_char(CURRENT_SESSION)]])
+_,SESSION_ID = wrapper:query([[SELECT TO_CHAR(CURRENT_SESSION)]])
 wrapper:log('INFO','SESSION_ID='..SESSION_ID[1][1],null)
 wrapper:set_param('STAGE_TMP_TBL','TRIPDATA_'..SESSION_ID[1][1])
 
@@ -142,11 +149,11 @@ wrapper:set_param('STAGE_TMP_TBL','TRIPDATA_'..SESSION_ID[1][1])
 */
 --load yellow from start to 2015
 wrapper:set_param('VENDOR_TYPE','yellow')  
-for FILE_ID,TRIP_MONTH,SITE_URL,FILENAME in wrapper:query_values( [[    select ID, TRIP_MONTH, SITE_URL,FILENAME 
-                                                                        from ::STAGE_SCM.RAW_DATA_URLS 
-                                                                        where LOADED_TIMESTAMP is NULL 
-                                                                        and TYPE=:VENDOR_TYPE 
-                                                                        and TRIP_MONTH < '2015-01-01']]) do
+for FILE_ID,TRIP_MONTH,SITE_URL,FILENAME in wrapper:query_values( [[    SELECT ID, TRIP_MONTH, SITE_URL,FILENAME 
+                                                                        FROM ::STAGE_SCM.RAW_DATA_URLS 
+                                                                        WHERE LOADED_TIMESTAMP IS NULL 
+                                                                        AND TYPE=:VENDOR_TYPE 
+                                                                        AND TRIP_MONTH < '2015-01-01']]) do
 	INSERT_COLS=[[VENDOR_ID, 
 	               PICKUP_DATETIME, 
 	               DROPOFF_DATETIME, 
@@ -184,7 +191,12 @@ for FILE_ID,TRIP_MONTH,SITE_URL,FILENAME in wrapper:query_values( [[    select I
 	               TOLLS_AMOUNT DECIMAL(9,2), 
 	               TOTAL_AMOUNT DECIMAL(9,2)]]
 	FILE_OPTIONS=''
-	process_file(FILE_ID,TRIP_MONTH,SITE_URL,FILENAME,INSERT_COLS,CREATE_COLS,FILE_OPTIONS) 
+	output('loading file: '..tostring(FILE_ID))
+	process_file(  FILE_ID,TRIP_MONTH,
+	               SITE_URL,FILENAME,
+	               INSERT_COLS,
+	               CREATE_COLS,
+	               FILE_OPTIONS)
 end
 
 --load yellow from 2015 to 2016-07 (Pickup/Dropoff Longitude/Latitude replaced with LocationID)
@@ -233,7 +245,11 @@ for FILE_ID,TRIP_MONTH,SITE_URL,FILENAME in wrapper:query_values( [[    select I
 	               IMPROVEMENT_SURCHARGE DECIMAL(9,2), 
 	               TOTAL_AMOUNT DECIMAL(9,2)]]
 	FILE_OPTIONS=''
-	process_file(FILE_ID,TRIP_MONTH,SITE_URL,FILENAME,INSERT_COLS,CREATE_COLS,FILE_OPTIONS) 
+	process_file(  FILE_ID,TRIP_MONTH,
+	               SITE_URL,FILENAME,
+	               INSERT_COLS,
+	               CREATE_COLS,
+	               FILE_OPTIONS)
 end
 
 --load yellow from 2016-07 to end
@@ -241,8 +257,7 @@ for FILE_ID,TRIP_MONTH,SITE_URL,FILENAME in wrapper:query_values( [[    select I
                                                                         from ::STAGE_SCM.RAW_DATA_URLS 
                                                                         where LOADED_TIMESTAMP is NULL 
                                                                         and TYPE=:VENDOR_TYPE 
-                                                                        /*and TRIP_MONTH >= '2016-07-01'*/
-                                                                        and TRIP_MONTH >= '2019-01-01'
+                                                                        and TRIP_MONTH >= '2016-07-01'
                                                                         and TRIP_MONTH < '2020-01-01']]) do
 	INSERT_COLS=[[VENDOR_ID,
 	               PICKUP_DATETIME,
@@ -279,7 +294,11 @@ for FILE_ID,TRIP_MONTH,SITE_URL,FILENAME in wrapper:query_values( [[    select I
 	               IMPROVEMENT_SURCHARGE DECIMAL(9,2), 
 	               TOTAL_AMOUNT DECIMAL(9,2)]]
 	FILE_OPTIONS='1..17'
-	process_file(FILE_ID,TRIP_MONTH,SITE_URL,FILENAME,INSERT_COLS,CREATE_COLS,FILE_OPTIONS) 
+	process_file(  FILE_ID,TRIP_MONTH,
+	               SITE_URL,FILENAME,
+	               INSERT_COLS,
+	               CREATE_COLS,
+	               FILE_OPTIONS)
 end
 
 /*
@@ -333,7 +352,11 @@ for FILE_ID,TRIP_MONTH,SITE_URL,FILENAME in wrapper:query_values( [[    select I
 	               PAYMENT_TYPE varchar(20), 
 	               TRIP_TYPE varchar(20)]]
 	FILE_OPTIONS='1..20'
-	process_file(FILE_ID,TRIP_MONTH,SITE_URL,FILENAME,INSERT_COLS,CREATE_COLS,FILE_OPTIONS) 
+	process_file(  FILE_ID,TRIP_MONTH,
+	               SITE_URL,FILENAME,
+	               INSERT_COLS,
+	               CREATE_COLS,
+	               FILE_OPTIONS)
 end
 
 --load green from 2015-2017 (IMPROVEMENT_SURCHARGE was added)
@@ -386,7 +409,11 @@ for FILE_ID,TRIP_MONTH,SITE_URL,FILENAME in wrapper:query_values( [[    select I
 	               PAYMENT_TYPE varchar(20), 
 	               TRIP_TYPE varchar(20)]]
 	FILE_OPTIONS='1..21'
-	process_file(FILE_ID,TRIP_MONTH,SITE_URL,FILENAME,INSERT_COLS,CREATE_COLS,FILE_OPTIONS) 
+	process_file(  FILE_ID,TRIP_MONTH,
+	               SITE_URL,FILENAME,
+	               INSERT_COLS,
+	               CREATE_COLS,
+	               FILE_OPTIONS)
 end
 
 --load green from 2017-2019 (PICKUP_LAT/LONG and DROPOFF_LAT/LONG were replaced by PICKUP/DROPOFF_LOCATIONID)
@@ -435,6 +462,43 @@ for FILE_ID,TRIP_MONTH,SITE_URL,FILENAME in wrapper:query_values( [[    select I
 	               PAYMENT_TYPE varchar(20), 
 	               TRIP_TYPE varchar(20)]]
 	FILE_OPTIONS='1..19'
-	process_file(FILE_ID,TRIP_MONTH,SITE_URL,FILENAME,INSERT_COLS,CREATE_COLS,FILE_OPTIONS) 
+	process_file(  FILE_ID,TRIP_MONTH,
+	               SITE_URL,FILENAME,
+	               INSERT_COLS,
+	               CREATE_COLS,
+	               FILE_OPTIONS)
 end
+
+/*
+############################## HVFHV DATA ############################## 
+*/
+wrapper:set_param('VENDOR_TYPE','fhvhv')  
+--load high volume-fhv from 2019
+for FILE_ID,TRIP_MONTH,SITE_URL,FILENAME in wrapper:query_values( [[    select ID, TRIP_MONTH, SITE_URL,FILENAME 
+                                                                        from ::STAGE_SCM.RAW_DATA_URLS 
+                                                                        where LOADED_TIMESTAMP is NULL 
+                                                                        and TYPE=:VENDOR_TYPE
+                                                                        and TRIP_MONTH < '2019-12-01']]) do
+	INSERT_COLS=[[HVFHS_LICENSE_NUM,
+	               PICKUP_DATETIME,
+                       DROPOFF_DATETIME,
+                       PICKUP_LOCATIONID,
+	               DROPOFF_LOCATIONID, 
+                       STORE_AND_FWD_FLAG
+                       ]]
+       CREATE_COLS=[[HVFHS_LICENSE_NUM VARCHAR(20),
+	               PICKUP_DATETIME TIMESTAMP, 
+	               DROPOFF_DATETIME TIMESTAMP,
+	               PICKUP_LOCATIONID SMALLINT,
+	               DROPOFF_LOCATIONID SMALLINT,
+                       STORE_AND_FWD_FLAG VARCHAR(10)]]
+	FILE_OPTIONS='1,3..7'
+	process_file(  FILE_ID,TRIP_MONTH,
+	               SITE_URL,FILENAME,
+	               INSERT_COLS,
+	               CREATE_COLS,
+	               FILE_OPTIONS)
+end
+
+return wrapper:finish()
 /
