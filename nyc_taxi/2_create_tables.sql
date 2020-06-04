@@ -33,10 +33,11 @@ CREATE OR REPLACE TABLE NYC_TAXI_STAGE.trip_location_id_map (      trip_id decim
 
 --stage and prod trip tables
 CREATE OR REPLACE TABLE NYC_TAXI_STAGE.TRIPDATA  (
-        ID                      DECIMAL(12),
+        ID                      DECIMAL(12) IDENTITY,
         FILE_ID		        DECIMAL(9),
         VENDOR_TYPE             VARCHAR(20),
         VENDOR_ID               VARCHAR(20),
+        HVFHS_LICENSE_NUM       VARCHAR(20),
         PICKUP_DATETIME         TIMESTAMP,
         DROPOFF_DATETIME        TIMESTAMP,
         PASSENGER_COUNT         DECIMAL(10,0),
@@ -68,6 +69,7 @@ CREATE OR REPLACE TABLE NYC_TAXI.TRIPS (
         SRC_FILE_ID	      DECIMAL(9),
         CAB_TYPE_ID           DECIMAL(9),
         VENDORID              VARCHAR(9) ASCII,
+        HVFHS_LICENSE_NUM_ID  DECIMAL(1),
         PICKUP_DATE           DATE,
         DROPOFF_DATE          DATE,
         PICKUP_DATETIME       TIMESTAMP,
@@ -80,7 +82,7 @@ CREATE OR REPLACE TABLE NYC_TAXI.TRIPS (
         DROPOFF_LONGITUDE     DOUBLE,
         DROPOFF_LATITUDE      DOUBLE,
         DROPOFF_LOCATIONID    DECIMAL(3),
-        PASSENGER_COUNT       DECIMAL(2),
+        PASSENGER_COUNT       DECIMAL(3),
         TRIP_DISTANCE         DECIMAL(12,3),
         FARE_AMOUNT           DECIMAL(9,2),
         EXTRA                 DECIMAL(9,2),
@@ -114,3 +116,7 @@ CREATE OR REPLACE TABLE NYC_TAXI.trip_type_lookup(      trip_type_id    DECIMAL(
                 
 CREATE OR REPLACE TABLE NYC_TAXI.rate_code_lookup(      rate_code_id    DECIMAL(1),
                                                         rate_code       VARCHAR(100));
+                                                        
+CREATE OR REPLACE TABLE NYC_TAXI.hvfhs_license_lookup(  id decimal(3) IDENTITY PRIMARY KEY,
+                                                        high_volume_license_number varchar(10),
+                                                        name varchar(10));
