@@ -36,13 +36,18 @@ This is a rough outline of what is happening in the script:
 Following the script definition are the script calls. The script call is parametrized and fitted to each input file format. Since file formats changed a lot over the past years, a lot of different script calls are necessary.
 
 #### A note on GEOSPATIAL data
-The taxi zones are stored as high detail polygons:
-![A NYC taxi polygon](https://raw.githubusercontent.com/exasol/opendata-examples/LN_update_11_2019/nyc_taxi/2020-06-04%2012_26_20-DBeaver%207.1.0%20-%20TAXI_ZONES.png)
+The taxi zones are stored as high detail polygons: <br>
+![A NYC Taxi polygon](https://raw.githubusercontent.com/exasol/opendata-examples/LN_update_11_2019/nyc_taxi/2020-06-04%2012_26_20-DBeaver%207.1.0%20-%20TAXI_ZONES.png "A NYC Taxi polygon")
+
+
 To check if a point resides within this polygon is a very resource intensive task. In the ETL process the polygon is therefore broken up into pieces:
 
  1. We look for the smallest rectangle the polygon fits in:  `ST_ENVELOPE`
  2. We take the `ST_BOUNDARY`of this rectangle which only consists of the four corners of the rectangle
  3. We take the `ST_X` and `ST_Y` coordinates of the `ST_POINTN`'s 2 and 4 (upper left and lower right corner) of the `ST_BOUNDARY` of the rectangle and pass it to the `create_polygon_grid` [script](3_create_scripts.sql).
  4. The script calculates a grid which can be laid over the polygon. Default size is 10x10.
- 5. We with the polygon and the grid we no cut away anything from the grid that is not part of the polygon which results in a segmented version of the polygon: ![A segmented NYC taxi polygon](https://raw.githubusercontent.com/exasol/opendata-examples/LN_update_11_2019/nyc_taxi/2020-06-04%2016_03_48-DBeaver%207.1.0%20-%20SPATIAL_GRID_MERGE.png)
+ 5. We with the polygon and the grid we no cut away anything from the grid that is not part of the polygon which results in a segmented version of the polygon: 
+ 
+![A segmented NYC taxi polygon](https://raw.githubusercontent.com/exasol/opendata-examples/LN_update_11_2019/nyc_taxi/2020-06-04%2016_03_48-DBeaver%207.1.0%20-%20SPATIAL_GRID_MERGE.png)
+
 Instead of searching in one big polygon we can now search in a lot of small polygons which is significantly faster.
