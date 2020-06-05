@@ -1,3 +1,34 @@
+--polygon grid script
+--/
+CREATE OR REPLACE PYTHON3 SCALAR SCRIPT NYC_TAXI_STAGE.create_polygon_grid(     min_x DECIMAL(15,13), 
+                                                                                max_x DECIMAL(15,13), 
+                                                                                min_y DECIMAL(15,13), 
+                                                                                max_y DECIMAL(15,13)) EMITS (GRID_FIELD VARCHAR(300), SEGMENT_ID DECIMAL(3)) AS
+ 
+def run(ctx):
+        min_x = ctx.min_x
+        min_y = ctx.min_y
+        max_x = ctx.max_x
+        max_y = ctx.max_y
+ 
+        grid_width = 10  #GRID-SIZE DEFINITION: 10: 10 * 10 segments = 100 segments
+        x_step_width = (max_x-min_x)/grid_width
+        y_step_width = (max_y-min_y)/grid_width
+ 
+        segment_id = 0
+        for y in range (grid_width):
+                y_step = y * y_step_width
+                for x in range(grid_width):
+                        segment_id += 1
+                        x_step = x * x_step_width
+                        ctx.emit(f"POLYGON(({min_x + x_step} {min_y + y_step}, "
+                                        f"{min_x + x_step + x_step_width} {min_y + y_step}, "
+                                        f"{min_x + x_step + x_step_width} {min_y + y_step + y_step_width}, "
+                                        f"{min_x + x_step} {min_y + y_step + y_step_width}, "
+                                        f"{min_x + x_step} {min_y + y_step}))", segment_id)
+/
+
+--load script
 CREATE OR REPLACE LUA SCRIPT NYC_TAXI_STAGE.TRIPS_LOAD RETURNS TABLE AS
 import('ETL.QUERY_WRAPPER','QW')
 
@@ -70,8 +101,10 @@ function process_file(FILE_ID, TRIP_MONTH,SITE_URL, FILENAME, INSERT_COLS, CREAT
                                         FIRST_VALUE(zp.location_id) OVER (PARTITION BY t.id) AS pickup
                                  FROM ::STAGE_SCM.::STAGE_TBL t
                                  JOIN ::STAGE_SCM.::LOCATION_MAP m    ON m.trip_id = t.id 
-                                 JOIN ::PROD_SCM.TAXI_ZONES zp        ON ST_within(t.pick_geom, zp.polygon) = true
-                                 JOIN ::PROD_SCM.TAXI_ZONES zd        ON ST_within(t.drop_geom, zd.polygon) = true)
+                                 JOIN ::PROD_SCM.taxi_zones zp       ON ST_WITHIN(t.pick_geom, zp.polygon) = true
+                                 JOIN ::PROD_SCM.taxi_zones zd       ON ST_WITHIN(t.drop_geom, zd.polygon) = true
+                                 /*WHERE t.dropoff_locationid IS NULL OR
+                                        t.pickup_locationid IS NULL*/) /*Diese Where clause könnte die temporäre trip_locaton_id_map ersetzen. der marge ginge dann in tripdata*/
                         subselect
                         ON      insert_target.trip_id = subselect.id
                         WHEN MATCHED THEN 

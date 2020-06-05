@@ -85,6 +85,21 @@ INSERT INTO NYC_TAXI.hvfhs_license_lookup VALUES        (1, 'HV0002', 'Juno'),
                                                         (3, 'HV0004', 'Via'),
                                                         (4, 'HV0005', 'Lyft');
 
+--fill spatial_grind
+INSERT INTO NYC_TAXI_STAGE.spatial_grid (location_id, grid_segment, segment_id)
+        SELECT location_id, NYC_TAXI_STAGE.create_polygon_grid(
+                                ST_X(ST_POINTN(ST_BOUNDARY(ST_ENVELOPE(polygon)), 4)), --4 = Top-Left Corner of the envelope
+                                ST_X(ST_POINTN(ST_BOUNDARY(ST_ENVELOPE(polygon)), 2)), --2 = Bottom-Right Corner of the envelope
+                                ST_Y(ST_POINTN(ST_BOUNDARY(ST_ENVELOPE(polygon)), 2)),
+                                ST_Y(ST_POINTN(ST_BOUNDARY(ST_ENVELOPE(polygon)), 4)))
+        FROM NYC_TAXI_.taxi_zones;
+
+--create and fill spatial_grid_merge --> Take the rectangles from spatial_grid and merge them with the borders of the polgons
+CREATE OR REPLACE TABLE NYC_TAXI_STAGE.spatial_grid_merge AS(
+        SELECT g.location_id, g.segment_id, ST_INTERSECTION(g.grid_segment, z.polygon) AS location_segment
+        FROM NYC_TAXI_STAGE.spatial_grid g
+        JOIN NYC_TAXI_.taxi_zones z ON g.location_id = z.location_id AND ST_INTERSECTS(g.grid_segment, z.polygon));
+        
 -- load data
 --TIP: all data will be loaded, that has no loaded_timestamp.
 --     If you want to load the data on a small machine, you can simply set a dummy loaded_timestamp
