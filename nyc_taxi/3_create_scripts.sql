@@ -100,11 +100,9 @@ function process_file(FILE_ID, TRIP_MONTH,SITE_URL, FILENAME, INSERT_COLS, CREAT
                                         FIRST_VALUE(zd.location_id) OVER (PARTITION BY t.id) AS dropoff,
                                         FIRST_VALUE(zp.location_id) OVER (PARTITION BY t.id) AS pickup
                                  FROM ::STAGE_SCM.::STAGE_TBL t
-                                 JOIN ::STAGE_SCM.::LOCATION_MAP m    ON m.trip_id = t.id 
-                                 JOIN ::PROD_SCM.taxi_zones zp       ON ST_WITHIN(t.pick_geom, zp.polygon) = true
-                                 JOIN ::PROD_SCM.taxi_zones zd       ON ST_WITHIN(t.drop_geom, zd.polygon) = true
-                                 /*WHERE t.dropoff_locationid IS NULL OR
-                                        t.pickup_locationid IS NULL*/) /*Diese Where clause könnte die temporäre trip_locaton_id_map ersetzen. der marge ginge dann in tripdata*/
+                                 JOIN ::STAGE_SCM.::LOCATION_MAP m      ON m.trip_id = t.id 
+                                 JOIN ::STAGE_SCM.spatial_grid_merge zp ON ST_WITHIN(t.pick_geom, zp.location_segment) = true
+                                 JOIN ::STAGE_SCM.spatial_grid_merge zd ON ST_WITHIN(t.drop_geom, zd.location_segment) = true)
                         subselect
                         ON      insert_target.trip_id = subselect.id
                         WHEN MATCHED THEN 
