@@ -170,7 +170,7 @@ wrapper = QW.new( 'NYC_TAXI_STAGE.JOB_LOG', 'NYC_TAXI_STAGE.JOB_DETAILS', 'TRIPS
 wrapper:set_param('STAGE_SCM',quote('NYC_TAXI_STAGE'))
 wrapper:set_param('STAGE_TBL',quote('TRIPDATA'))
 
-wrapper:set_param('PROD_SCM',quote('NYC_TAXI_')) 
+wrapper:set_param('PROD_SCM',quote('NYC_TAXI')) 
 wrapper:set_param('PROD_TBL',quote('TRIPS'))
 
 _,SESSION_ID = wrapper:query([[SELECT TO_CHAR(CURRENT_SESSION)]])
