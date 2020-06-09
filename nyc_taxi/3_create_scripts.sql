@@ -3,7 +3,7 @@
 CREATE OR REPLACE PYTHON3 SCALAR SCRIPT NYC_TAXI_STAGE.create_polygon_grid(     min_x DECIMAL(15,13), 
                                                                                 max_x DECIMAL(15,13), 
                                                                                 min_y DECIMAL(15,13), 
-                                                                                max_y DECIMAL(15,13)) EMITS (GRID_FIELD VARCHAR(300), SEGMENT_ID DECIMAL(3)) AS
+                                                                                max_y DECIMAL(15,13)) EMITS (GRID_FIELD VARCHAR(500), SEGMENT_ID DECIMAL(3)) AS
  
 def run(ctx):
         min_x = ctx.min_x
@@ -11,7 +11,7 @@ def run(ctx):
         max_x = ctx.max_x
         max_y = ctx.max_y
  
-        grid_width = 10  #GRID-SIZE DEFINITION: 10: 10 * 10 segments = 100 segments
+        grid_width = 25  #GRID-SIZE DEFINITION: 10: 10 * 10 segments = 100 segments
         x_step_width = (max_x-min_x)/grid_width
         y_step_width = (max_y-min_y)/grid_width
  
@@ -100,9 +100,8 @@ function process_file(FILE_ID, TRIP_MONTH,SITE_URL, FILENAME, INSERT_COLS, CREAT
                                         FIRST_VALUE(zd.location_id) OVER (PARTITION BY t.id) AS dropoff,
                                         FIRST_VALUE(zp.location_id) OVER (PARTITION BY t.id) AS pickup
                                  FROM ::STAGE_SCM.::STAGE_TBL t
-                                 JOIN ::STAGE_SCM.::LOCATION_MAP m      ON m.trip_id = t.id 
-                                 JOIN ::STAGE_SCM.spatial_grid_merge zp ON ST_WITHIN(t.pick_geom, zp.location_segment) = true
-                                 JOIN ::STAGE_SCM.spatial_grid_merge zd ON ST_WITHIN(t.drop_geom, zd.location_segment) = true)
+                                 JOIN ::STAGE_SCM.spatial_grid_merge zp ON ST_WITHIN(t.pick_geom, zp.location_segment)
+                                 JOIN ::STAGE_SCM.spatial_grid_merge zd ON ST_WITHIN(t.drop_geom, zd.location_segment))
                         subselect
                         ON      insert_target.trip_id = subselect.id
                         WHEN MATCHED THEN 
