@@ -45,9 +45,9 @@ To check if a point resides within this polygon is a very resource intensive tas
  1. We look for the smallest rectangle the polygon fits in:  `ST_ENVELOPE`
  2. We take the `ST_BOUNDARY`of this rectangle which only consists of the four corners of the rectangle
  3. We take the `ST_X` and `ST_Y` coordinates of the `ST_POINTN`'s 2 and 4 (upper left and lower right corner) of the `ST_BOUNDARY` of the rectangle and pass it to the `create_polygon_grid` [script](3_create_scripts.sql).
- 4. The script calculates a grid which can be laid over the polygon. Default size is 10x10.
- 5. We with the polygon and the grid we no cut away anything from the grid that is not part of the polygon which results in a segmented version of the polygon: 
+ 4. The script calculates a grid which can be laid over the polygon. Default size is 10x10 but we use 25x25 for even finer segments.
+ 5. With the polygon and the grid we now cut away anything from the grid that is not part of the polygon which results in a segmented version of the polygon: 
  
 ![A segmented NYC taxi polygon](https://raw.githubusercontent.com/exasol/opendata-examples/LN_update_11_2019/nyc_taxi/2020-06-04%2016_03_48-DBeaver%207.1.0%20-%20SPATIAL_GRID_MERGE.png)
 
-Instead of searching in one big polygon we can now search in a lot of small polygons which is significantly faster.
+Instead of searching in one big polygon we can now search in a lot of small polygons which is significantly (in this case 10x) faster.
