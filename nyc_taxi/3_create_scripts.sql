@@ -127,10 +127,10 @@ function process_file(FILE_ID, TRIP_MONTH,SITE_URL, FILENAME, INSERT_COLS, CREAT
                                 t.rate_code_id,
                                 t.pickup_longitude,
                                 t.pickup_latitude,
-                                CASE    WHEN z.trip_id IS NULL THEN t.pickup_locationid ELSE z.pickup_locationid END AS pickup_locationid,
+                                CASE    WHEN z.trip_id IS NULL THEN t.pickup_locationid ELSE z.pickup_locationid END AS pickup_location_id,
                                 t.dropoff_longitude,
                                 t.dropoff_latitude,
-                                CASE    WHEN z.trip_id IS NULL THEN t.dropoff_locationid ELSE z.dropoff_locationid END AS dropoff_locationid,
+                                CASE    WHEN z.trip_id IS NULL THEN t.dropoff_locationid ELSE z.dropoff_locationid END AS dropoff_location_id,
                                 t.passenger_count,
                                 t.trip_distance,
                                 t.fare_amount,
@@ -287,8 +287,7 @@ for FILE_ID,TRIP_MONTH,SITE_URL,FILENAME in wrapper:query_values( [[    select I
                                                                         from ::STAGE_SCM.RAW_DATA_URLS 
                                                                         where LOADED_TIMESTAMP is NULL 
                                                                         and TYPE=:VENDOR_TYPE 
-                                                                        and TRIP_MONTH >= '2016-07-01'
-                                                                        and TRIP_MONTH < '2020-01-01']]) do
+                                                                        and TRIP_MONTH >= '2016-07-01']]) do
 	INSERT_COLS=[[VENDOR_ID,
 	               PICKUP_DATETIME,
 	               DROPOFF_DATETIME,
@@ -451,8 +450,7 @@ for FILE_ID,TRIP_MONTH,SITE_URL,FILENAME in wrapper:query_values( [[    select I
                                                                         from ::STAGE_SCM.RAW_DATA_URLS 
                                                                         where LOADED_TIMESTAMP is NULL 
                                                                         and TYPE=:VENDOR_TYPE 
-                                                                        and TRIP_MONTH >= '2017-01-01'
-                                                                        and TRIP_MONTH < '2019-12-01']]) do
+                                                                        and TRIP_MONTH >= '2017-01-01']]) do
 	INSERT_COLS=[[VENDOR_ID,
                        PICKUP_DATETIME,
                        DROPOFF_DATETIME,
@@ -507,8 +505,7 @@ wrapper:set_param('VENDOR_TYPE','fhvhv')
 for FILE_ID,TRIP_MONTH,SITE_URL,FILENAME in wrapper:query_values( [[    select ID, TRIP_MONTH, SITE_URL,FILENAME 
                                                                         from ::STAGE_SCM.RAW_DATA_URLS 
                                                                         where LOADED_TIMESTAMP is NULL 
-                                                                        and TYPE=:VENDOR_TYPE
-                                                                        and TRIP_MONTH < '2019-12-01']]) do
+                                                                        and TYPE=:VENDOR_TYPE]]) do
 	INSERT_COLS=[[HVFHS_LICENSE_NUM,
 	               PICKUP_DATETIME,
                        DROPOFF_DATETIME,
