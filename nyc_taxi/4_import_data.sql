@@ -60,7 +60,7 @@ when not matched then insert (type,trip_month,site_url,filename) values (type,tr
 --fill cab_types
 INSERT INTO NYC_TAXI.cab_types (type) SELECT 'yellow';
 INSERT INTO NYC_TAXI.cab_types (type) SELECT 'green';
-INSERT INTO NYC_TAXI.cab_types (type) SELECT 'uber';
+INSERT INTO NYC_TAXI.cab_types (type) SELECT 'fhvhv';
 
 --fill vendor_lookup
 INSERT INTO NYC_TAXI.vendor_lookup VALUES (1, 'Creative Mobile Technologies', 'CMT'),
