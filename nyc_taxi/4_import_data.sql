@@ -92,13 +92,13 @@ INSERT INTO NYC_TAXI_STAGE.spatial_grid (location_id, grid_segment, segment_id)
                                 ST_X(ST_POINTN(ST_BOUNDARY(ST_ENVELOPE(polygon)), 2)), --2 = Bottom-Right Corner of the envelope
                                 ST_Y(ST_POINTN(ST_BOUNDARY(ST_ENVELOPE(polygon)), 2)),
                                 ST_Y(ST_POINTN(ST_BOUNDARY(ST_ENVELOPE(polygon)), 4)))
-        FROM NYC_TAXI_.taxi_zones;
+        FROM NYC_TAXI.taxi_zones;
 
 --create and fill spatial_grid_merge --> Take the rectangles from spatial_grid and merge them with the borders of the polygons
 CREATE OR REPLACE TABLE NYC_TAXI_STAGE.spatial_grid_merge AS(
         SELECT g.location_id, g.segment_id, ST_INTERSECTION(g.grid_segment, z.polygon) AS location_segment
         FROM NYC_TAXI_STAGE.spatial_grid g
-        JOIN NYC_TAXI_.taxi_zones z ON g.location_id = z.location_id AND ST_INTERSECTS(g.grid_segment, z.polygon));
+        JOIN NYC_TAXI.taxi_zones z ON g.location_id = z.location_id AND ST_INTERSECTS(g.grid_segment, z.polygon));
         
 -- load data
 --TIP: all data will be loaded, that has no loaded_timestamp.
